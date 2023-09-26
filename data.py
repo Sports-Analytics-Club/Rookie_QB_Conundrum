@@ -4,31 +4,26 @@ from bs4 import BeautifulSoup
 
 alphabet = list(string.ascii_uppercase)
 
-base_url = "https://www.pro-football-reference.com/"
-
-# Create a QB_Data file that contains the parsed html files.
-import os 
-os.mkdir("QB_Data")
+base_url = "https://www.pro-football-reference.com/players/"
 
 for letter in alphabet:
-    url = f"{base_url}/players/{letter}/"
+    url = f"{base_url}{letter}/"
     response = requests.get(url)
 
     soup = BeautifulSoup(response.text, 'html.parser')
-    player_elements = soup.find_all('div', class_='players')
 
-    for player in player_elements:
-       player_link = player.find('a', href=True)
-       player_url = f"{base_url}{player_link['href']}"
+    section_wrapper = soup.find('div', class_='section_wrapper', id='all_players')
+    section_content = section_wrapper.find('div', class_='section_content', id='div_players')
+    p_tags = section_content.find_all('p')
 
-       player_response = requests.get(player_url)
-       player_soup = BeautifulSoup(player_response.text, 'html.parser')
+    for p in p_tags:
+        # Extract player name and years
+        player_name = p.find('a').text
+        player_years = p.find_next('a').text
 
-       player_info = player_soup.find('div', {'itemtype': 'https://schema.org/Person'}).text
-
-       # Extracting position and start year
-       position_start_year = player_info.split(')')[1].strip()
-
-       if "QB" in position_start_year and int(position_start_year.split('-')[0]) >= 1966:
-           with open(f"QB_Data/{player_link['href'].split('/')[1]}.html", "w+") as file:
-               file.write(player_response.text)
+        if "(QB)" in player_name and "2020" in player_years:
+            player_link = p.find('a')['href']
+            print(f"Player Name: {player_name}")
+            print(f"Player Link: {player_link}")
+            with open("//QB_Data/{player_link}", "w+") as f:
+                f.write(player_link)
