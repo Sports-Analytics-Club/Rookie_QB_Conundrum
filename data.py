@@ -1,29 +1,39 @@
-import string
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
+import time
 
-alphabet = list(string.ascii_uppercase)
+# Define url template and letters
+url_template = "https://www.pro-football-reference.com/players/{}/"
+letters = [chr(i) for i in range(ord('A'), ord('Z') + 1)]
 
-base_url = "https://www.pro-football-reference.com/players/"
-
-for letter in alphabet:
-    url = f"{base_url}{letter}/"
+# Function to scrape player links for a given letter
+def get_quarterbacks(letter):
+    url = url_template.format(letter)
     response = requests.get(url)
+    time.sleep(8)
 
     soup = BeautifulSoup(response.text, 'html.parser')
 
-    section_wrapper = soup.find('div', class_='section_wrapper', id='all_players')
-    section_content = section_wrapper.find('div', class_='section_content', id='div_players')
-    p_tags = section_content.find_all('p')
+    players = []
+    for p in soup.select('#div_players p'):
+        meta = p.get_text()
+        position = str(meta.split('(')[1].split(')')[0])
+        is_qb = 1 if 'QB' in position else 0
+        year_span = meta.split(')')[1].strip()
+        start_year = int(year_span.split('-')[0])
+        end_year = int(year_span.split('-')[1])
+        slug = p.find('a')['href']
+        full_slug = f"https://www.pro-football-reference.com{slug}"
+        if is_qb == 1:
+            players.append([meta, position, year_span, start_year, end_year, full_slug])
+    df = pd.DataFrame(players, columns=['meta', 'position', 'year_span', 'start_year', 'end_year', 'full_slug'])
+    df['iter'] = letter # Add the letter for debugging
+    return df
 
-    for p in p_tags:
-        # Extract player name and years
-        player_name = p.find('a').text
-        player_years = p.find_next('a').text
 
-        if "(QB)" in player_name and "2020" in player_years:
-            player_link = p.find('a')['href']
-            print(f"Player Name: {player_name}")
-            print(f"Player Link: {player_link}")
-            with open("//QB_Data/{player_link}", "w+") as f:
-                f.write(player_link)
+# Scrape all player links for all letters
+all_players = pd.concat([get_quarterbacks(letter) for letter in letters], ignore_index=True)
+
+# Save data to csv file
+all_players.to_csv("player_links.csv", index="False")
